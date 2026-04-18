@@ -1,7 +1,7 @@
 import os
 import json
 from flask import Flask, request, jsonify, render_template
-import google.generativeai as genai
+from groq import Groq
 from dotenv import load_dotenv
 from scorer import score_opportunity
 from skills_engine import infer_skills
@@ -9,8 +9,16 @@ from cover_letter import generate_cover_letter
 
 load_dotenv()
 app = Flask(__name__)
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-model = genai.GenerativeModel("gemini-1.5-flash")
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+def generate_content(prompt):
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+        max_tokens=4096
+    )
+    return response.choices[0].message.content
 
 EXTRACTION_PROMPT = """You are an expert email analyst for university students in Pakistan.
 Analyze each email in the batch below and return a JSON array.
@@ -90,8 +98,7 @@ def analyze():
 
     try:
         full_prompt = EXTRACTION_PROMPT + f"\n\nEmails to analyze:\n\n{emails_text}"
-        response = model.generate_content(full_prompt)
-        raw = response.text.strip()
+        raw = generate_content(full_prompt).strip()
 
         if "```" in raw:
             for part in raw.split("```"):
