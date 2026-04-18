@@ -1,0 +1,514 @@
+{% extends "base.html" %}
+{% block title %}OpportuNest — Paste Your Emails{% endblock %}
+{% block progress %}66{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .email-editor {
+    background: var(--surface-raised);
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .email-editor:focus-within {
+    border-color: rgba(245,200,66,0.4);
+    box-shadow: 0 0 0 4px rgba(245,200,66,0.06), 0 8px 40px rgba(0,0,0,0.3);
+  }
+  .editor-toolbar {
+    background: var(--surface-high);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .editor-dots { display: flex; gap: 7px; }
+  .editor-dot { width: 11px; height: 11px; border-radius: 50%; }
+
+  textarea#emails {
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: 24px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.8;
+    outline: none;
+    resize: none;
+    min-height: 400px;
+    caret-color: var(--gold);
+  }
+  textarea#emails::placeholder { color: var(--text-dim); font-style: italic; }
+
+  .email-counter {
+    background: var(--surface-high);
+    border-top: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; color: var(--text-dim);
+  }
+
+  /* Sample emails */
+  .sample-card {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px;
+    cursor: pointer; transition: all 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .sample-card::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(245,200,66,0.04), transparent);
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .sample-card:hover { border-color: rgba(245,200,66,0.3); transform: translateY(-2px); }
+  .sample-card:hover::before { opacity: 1; }
+
+  .sample-type-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  /* Analyze big button */
+  .analyze-big {
+    width: 100%; height: 64px;
+    background: linear-gradient(135deg, var(--gold) 0%, #e8a820 50%, var(--ember) 100%);
+    background-size: 200% auto;
+    color: #000; font-weight: 800; font-size: 17px;
+    border: none; border-radius: 16px; cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: -0.02em;
+    transition: all 0.3s;
+    animation: shimmer 3s linear infinite;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    position: relative; overflow: hidden;
+  }
+  .analyze-big:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 40px rgba(245,200,66,0.35), 0 0 60px rgba(245,200,66,0.1);
+  }
+  .analyze-big:active { transform: translateY(0); }
+  .analyze-big:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+  @keyframes shimmer {
+    0% { background-position: 0% center; }
+    100% { background-position: 200% center; }
+  }
+
+  /* Profile chip display */
+  .profile-peek {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px 20px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+
+  /* Email parse preview animation */
+  .parse-line {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: var(--text-muted);
+    padding: 6px 0;
+    opacity: 0; transform: translateX(-10px);
+    animation: slideRight 0.3s ease forwards;
+  }
+  .parse-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); flex-shrink: 0; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  /* Loading overlay */
+  #loading-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 500;
+    background: rgba(10,10,15,0.95);
+    backdrop-filter: blur(20px);
+    flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+  }
+  #loading-overlay.active { display: flex; }
+
+  .loading-ring {
+    width: 80px; height: 80px; border-radius: 50%;
+    border: 3px solid var(--border);
+    border-top-color: var(--gold);
+    border-right-color: var(--ember);
+    animation: spin 1s linear infinite;
+  }
+  .loading-steps { display: flex; flex-direction: column; gap: 8px; max-width: 340px; width: 100%; }
+  .loading-step {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; border-radius: 10px;
+    font-size: 13px; color: var(--text-dim);
+    transition: all 0.3s;
+  }
+  .loading-step.active {
+    background: rgba(245,200,66,0.08);
+    color: var(--gold); border: 1px solid rgba(245,200,66,0.15);
+  }
+  .loading-step.done {
+    color: var(--mint);
+    background: rgba(0,229,160,0.05);
+    border: 1px solid rgba(0,229,160,0.1);
+  }
+  .step-icon { font-size: 16px; width: 24px; text-align: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="loading-overlay">
+  <div class="loading-ring"></div>
+  <div style="text-align:center;">
+    <div style="font-size:22px;font-weight:800;letter-spacing:-0.03em;color:var(--text);margin-bottom:6px;">AI is analyzing your inbox</div>
+    <div style="font-size:14px;color:var(--text-muted);">This takes about 10–15 seconds</div>
+  </div>
+  <div class="loading-steps">
+    <div class="loading-step active" id="step-scan"><span class="step-icon">📧</span> Scanning emails for opportunities</div>
+    <div class="loading-step" id="step-extract"><span class="step-icon">🔍</span> Extracting deadlines & eligibility</div>
+    <div class="loading-step" id="step-match"><span class="step-icon">🎯</span> Matching against your profile</div>
+    <div class="loading-step" id="step-rank"><span class="step-icon">🏆</span> Ranking by urgency & fit</div>
+    <div class="loading-step" id="step-done"><span class="step-icon">✦</span> Building your priority board</div>
+  </div>
+</div>
+
+<div style="max-width:1100px;margin:0 auto;padding:50px 40px;">
+
+  <!-- Header -->
+  <div style="margin-bottom:40px;" class="animate-fadeUp">
+    <div class="badge badge-gold" style="margin-bottom:14px;">Step 2 of 3</div>
+    <h1 style="font-size:40px;font-weight:800;letter-spacing:-0.04em;margin-bottom:10px;">
+      Paste your emails
+    </h1>
+    <p style="font-size:15px;color:var(--text-muted);">Add 5–15 emails. Separate each with <code style="background:var(--surface-high);padding:2px 8px;border-radius:6px;font-size:13px;color:var(--gold);">---</code> on its own line.</p>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 360px;gap:28px;align-items:start;">
+
+    <!-- Email Input -->
+    <div class="animate-fadeUp delay-1">
+
+      <!-- Profile peek -->
+      <div class="profile-peek" style="margin-bottom:16px;" id="profile-peek">
+        <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;width:100%;">Analyzing for</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);" id="peek-name">—</div>
+        <div class="badge badge-muted" id="peek-degree">—</div>
+        <div class="badge badge-gold" id="peek-cgpa">—</div>
+        <a href="/" style="margin-left:auto;font-size:12px;color:var(--text-dim);text-decoration:none;">Edit ✏</a>
+      </div>
+
+      <div class="email-editor">
+        <div class="editor-toolbar">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="editor-dots">
+              <div class="editor-dot" style="background:#ff5f56;"></div>
+              <div class="editor-dot" style="background:#febc2e;"></div>
+              <div class="editor-dot" style="background:#28c840;"></div>
+            </div>
+            <span style="font-size:12px;color:var(--text-dim);">opportunity_emails.txt</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span id="email-count-badge" class="badge badge-muted">0 emails detected</span>
+            <button class="btn-ghost" style="padding:6px 12px;font-size:12px;" onclick="clearEmails()">Clear</button>
+          </div>
+        </div>
+        <textarea id="emails" placeholder="Paste your emails here...
+
+Example:
+---
+From: scholarships@hec.gov.pk
+Subject: HEC Need-Based Scholarship 2026
+Date: April 10, 2026
+
+Dear Student,
+Applications are open for the HEC Need-Based Scholarship for Spring 2026. 
+Eligibility: CGPA 3.0+, financial need demonstrated.
+Deadline: April 30, 2026
+Apply at: https://hec.gov.pk/scholarships
+
+---
+From: internships@google.com
+Subject: Google STEP Internship — Applications Open
+..." oninput="countEmails()"></textarea>
+        <div class="email-counter">
+          <span id="char-count">0 characters</span>
+          <span>Tip: Include From, Subject, Date, and body for best results</span>
+        </div>
+      </div>
+
+      <div id="parse-preview" style="margin-top:12px;padding:12px 16px;background:var(--surface-raised);border-radius:12px;border:1px solid var(--border);display:none;">
+        <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:8px;">Detected</div>
+        <div id="parse-lines"></div>
+      </div>
+
+      <!-- Analyze button -->
+      <button class="analyze-big" id="analyze-btn" onclick="runAnalysis()" style="margin-top:20px;">
+        <span id="btn-label">✦ Analyze My Inbox</span>
+      </button>
+      <div id="btn-error" style="display:none;color:var(--red);font-size:13px;text-align:center;margin-top:8px;"></div>
+    </div>
+
+    <!-- Right sidebar -->
+    <div style="display:flex;flex-direction:column;gap:16px;" class="animate-fadeUp delay-2">
+
+      <!-- Sample emails -->
+      <div class="glass-card" style="padding:20px;">
+        <div class="section-heading">Load Sample Emails</div>
+        <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">For demo purposes — click to load pre-made emails</p>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="sample-card" onclick="loadSample('hec')">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+              <div class="sample-type-dot" style="background:var(--red);box-shadow:0 0 6px var(--red);"></div>
+              <span style="font-size:13px;font-weight:600;color:var(--text);">HEC Scholarship</span>
+              <span class="badge badge-red" style="margin-left:auto;font-size:10px;">2 days left</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-dim);">scholarships@hec.gov.pk</div>
+          </div>
+          <div class="sample-card" onclick="loadSample('google')">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+              <div class="sample-type-dot" style="background:var(--yellow);"></div>
+              <span style="font-size:13px;font-weight:600;color:var(--text);">Google Internship</span>
+              <span class="badge badge-yellow" style="margin-left:auto;font-size:10px;">5 days</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-dim);">internships@google.com</div>
+          </div>
+          <div class="sample-card" onclick="loadSample('lums')">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+              <div class="sample-type-dot" style="background:var(--green);"></div>
+              <span style="font-size:13px;font-weight:600;color:var(--text);">LUMS Fellowship</span>
+              <span class="badge badge-green" style="margin-left:auto;font-size:10px;">21 days</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-dim);">fellowships@lums.edu.pk</div>
+          </div>
+          <div class="sample-card" onclick="loadSample('spam')">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+              <div class="sample-type-dot" style="background:var(--gray);"></div>
+              <span style="font-size:13px;font-weight:600;color:var(--text-muted);">+ Spam/Noise emails</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-dim);">3 non-opportunity emails</div>
+          </div>
+          <button class="btn-ghost" onclick="loadAllSamples()" style="width:100%;margin-top:4px;font-size:12px;">Load Complete Demo (10 emails)</button>
+        </div>
+      </div>
+
+      <!-- Tips -->
+      <div class="glass-card" style="padding:20px;">
+        <div class="section-heading">Tips</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;gap:10px;font-size:13px;color:var(--text-muted);">
+            <span style="color:var(--gold);flex-shrink:0;">①</span>
+            <span>Use <strong style="color:var(--text);">---</strong> between emails</span>
+          </div>
+          <div style="display:flex;gap:10px;font-size:13px;color:var(--text-muted);">
+            <span style="color:var(--gold);flex-shrink:0;">②</span>
+            <span>Include the <strong style="color:var(--text);">From:</strong> and <strong style="color:var(--text);">Subject:</strong> lines</span>
+          </div>
+          <div style="display:flex;gap:10px;font-size:13px;color:var(--text-muted);">
+            <span style="color:var(--gold);flex-shrink:0;">③</span>
+            <span>Mix real opportunities <strong style="color:var(--text);">+ spam</strong> to see the AI filter</span>
+          </div>
+          <div style="display:flex;gap:10px;font-size:13px;color:var(--text-muted);">
+            <span style="color:var(--gold);flex-shrink:0;">④</span>
+            <span>5–15 emails gives the best demo</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load profile from session
+window.addEventListener('load', () => {
+  const p = JSON.parse(sessionStorage.getItem('profile') || '{}');
+  document.getElementById('peek-name').textContent = p.name || 'Anonymous Student';
+  document.getElementById('peek-degree').textContent = [p.degree, p.program].filter(Boolean).join(' ') || 'Student';
+  document.getElementById('peek-cgpa').textContent = p.cgpa ? `CGPA ${p.cgpa}` : 'CGPA —';
+});
+
+// Count emails
+function countEmails() {
+  const text = document.getElementById('emails').value;
+  const count = (text.split(/^---$/m).length);
+  const nonEmpty = text.trim() ? count : 0;
+  document.getElementById('email-count-badge').textContent = `${nonEmpty} email${nonEmpty !== 1 ? 's' : ''} detected`;
+  document.getElementById('char-count').textContent = `${text.length} characters`;
+
+  // Parse preview
+  if (text.trim().length > 50) {
+    const subjects = [...text.matchAll(/Subject:\s*(.+)/gi)].map(m => m[1].trim());
+    const froms = [...text.matchAll(/From:\s*(.+)/gi)].map(m => m[1].trim());
+    if (subjects.length > 0) {
+      const preview = document.getElementById('parse-preview');
+      const lines = document.getElementById('parse-lines');
+      preview.style.display = 'block';
+      lines.innerHTML = subjects.slice(0,5).map((s,i) => `
+        <div class="parse-line" style="animation-delay:${i*0.05}s;">
+          <div class="parse-dot"></div>
+          <span>${s}</span>
+          ${froms[i] ? `<span style="margin-left:auto;font-size:11px;color:var(--text-dim);">${froms[i]}</span>` : ''}
+        </div>`).join('');
+    }
+  }
+}
+
+function clearEmails() {
+  document.getElementById('emails').value = '';
+  countEmails();
+  document.getElementById('parse-preview').style.display = 'none';
+}
+
+// Sample emails
+const SAMPLES = {
+  hec: `---
+From: scholarships@hec.gov.pk
+Subject: HEC Need-Based Scholarship 2026 — Applications Open
+Date: April 15, 2026
+
+Dear Student,
+
+The Higher Education Commission of Pakistan is pleased to announce the HEC Need-Based Scholarship Program for Spring 2026.
+
+Eligibility Criteria:
+- Enrolled in a recognized Pakistani university (BS/MS)
+- Minimum CGPA: 3.0/4.0
+- Must demonstrate financial need
+- Semester 2–8 only
+
+Required Documents: Transcript, Income Certificate, CNIC copy, Recommendation Letter
+Deadline: April 20, 2026
+Stipend: PKR 5,000/month + tuition waiver
+
+Apply at: https://hec.gov.pk/scholarships/need-based-2026
+Contact: scholarships@hec.gov.pk`,
+
+  google: `---
+From: university-programs@google.com
+Subject: Google STEP Internship — Summer 2026 Applications
+Date: April 12, 2026
+
+Dear Student,
+
+Google is recruiting for the STEP (Student Training in Engineering Program) Internship for Summer 2026.
+
+Who should apply:
+- Computer Science or Software Engineering students
+- 2nd or 3rd year undergraduate
+- Strong knowledge of data structures and algorithms
+- Python or Java programming experience required
+
+Duration: 10 weeks (June–August 2026)
+Location: Remote / Hybrid
+Stipend: USD 1,500/month
+
+Application deadline: April 23, 2026
+Apply: https://careers.google.com/students/step`,
+
+  lums: `---
+From: research@lums.edu.pk
+Subject: LUMS Undergraduate Research Fellowship 2026
+Date: April 10, 2026
+
+Dear Prospective Fellow,
+
+LUMS invites applications for the Undergraduate Research Fellowship for Summer 2026.
+
+Eligibility:
+- 4th semester or above
+- CGPA 3.2 minimum
+- Interest in AI, Data Science, or Social Sciences
+- No prior research experience required
+
+Benefits: PKR 25,000 stipend + research mentorship + certificate
+Duration: 8 weeks
+
+Deadline: May 9, 2026
+Apply: https://research.lums.edu.pk/fellowship
+Contact: Dr. Ayesha Khan — a.khan@lums.edu.pk`,
+
+  spam: `---
+From: deals@shoppingworld.pk
+Subject: MEGA SALE — 70% off everything today only!!!
+Date: April 16, 2026
+
+Click here to claim your discount. Limited time offer. Buy now before stock runs out!
+
+---
+From: noreply@newsletter.com
+Subject: Your weekly university newsletter
+Date: April 15, 2026
+
+This week at university: Cafeteria menu update, parking regulations, library hours changed.
+
+---
+From: classmate123@gmail.com
+Subject: Notes for tomorrow's exam
+Date: April 16, 2026
+
+Hey, can you share your notes for the algorithms exam? I missed the last two lectures.`
+};
+
+function loadSample(key) {
+  const current = document.getElementById('emails').value;
+  const add = SAMPLES[key] || '';
+  document.getElementById('emails').value = (current ? current + '\n\n' : '') + add;
+  countEmails();
+  showToast('Sample email added', '📧');
+}
+
+function loadAllSamples() {
+  document.getElementById('emails').value = Object.values(SAMPLES).join('\n\n');
+  countEmails();
+  showToast('10 sample emails loaded — ready to analyze!', '✦');
+}
+
+// Loading animation
+function animateLoadingSteps() {
+  const steps = ['step-scan','step-extract','step-match','step-rank','step-done'];
+  let i = 0;
+  steps.forEach(s => document.getElementById(s).className = 'loading-step');
+  document.getElementById(steps[0]).classList.add('active');
+  const interval = setInterval(() => {
+    if (i > 0) document.getElementById(steps[i-1]).classList.remove('active');
+    if (i > 0) document.getElementById(steps[i-1]).classList.add('done');
+    if (i < steps.length) { document.getElementById(steps[i]).classList.add('active'); i++; }
+    else clearInterval(interval);
+  }, 2200);
+}
+
+// Run analysis
+async function runAnalysis() {
+  const emails = document.getElementById('emails').value.trim();
+  const errEl = document.getElementById('btn-error');
+  if (!emails) {
+    errEl.textContent = '⚠ Please paste at least one email before analyzing.';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  const profile = JSON.parse(sessionStorage.getItem('profile') || '{}');
+
+  document.getElementById('loading-overlay').classList.add('active');
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('btn-label').textContent = 'Analyzing...';
+  animateLoadingSteps();
+
+  try {
+    const res = await fetch('/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emails, profile })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    sessionStorage.setItem('results', JSON.stringify(data));
+    sessionStorage.setItem('profile', JSON.stringify(profile));
+    window.location.href = '/results';
+  } catch(e) {
+    document.getElementById('loading-overlay').classList.remove('active');
+    document.getElementById('analyze-btn').disabled = false;
+    document.getElementById('btn-label').textContent = '✦ Analyze My Inbox';
+    errEl.textContent = '⚠ ' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+</script>
+{% endblock %}

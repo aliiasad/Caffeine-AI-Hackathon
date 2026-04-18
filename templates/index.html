@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% block title %}OpportuNest — Build Your Profile{% endblock %}
+{% block progress %}33{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .hero-text {
+    font-size: clamp(48px, 7vw, 88px);
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    color: var(--text);
+  }
+  .hero-text .accent { color: var(--gold); font-family: 'Instrument Serif', serif; font-style: italic; }
+  .hero-sub { font-size: 16px; color: var(--text-muted); line-height: 1.7; max-width: 460px; }
+
+  .profile-card {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 36px;
+    position: relative;
+    overflow: hidden;
+  }
+  .profile-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    opacity: 0.4;
+  }
+
+  .skill-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface-high); border: 1px solid var(--border);
+    color: var(--text-muted); border-radius: 8px;
+    padding: 6px 12px; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; margin: 3px;
+  }
+  .skill-tag:hover { border-color: var(--gold); color: var(--gold); background: rgba(245,200,66,0.08); }
+  .skill-tag.selected { background: rgba(245,200,66,0.1); color: var(--gold); border-color: rgba(245,200,66,0.4); }
+  .skill-tag .remove { font-size: 10px; opacity: 0; transition: opacity 0.15s; }
+  .skill-tag.selected:hover .remove { opacity: 1; }
+
+  .type-option {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 12px; padding: 11px 14px; cursor: pointer;
+    transition: all 0.15s; font-size: 13px; font-weight: 500; color: var(--text-muted);
+  }
+  .type-option:hover { border-color: rgba(245,200,66,0.4); color: var(--text); }
+  .type-option.selected {
+    border-color: var(--gold); color: var(--gold);
+    background: rgba(245,200,66,0.06);
+  }
+  .type-option input { display: none; }
+  .type-icon { font-size: 16px; }
+
+  .fin-pill {
+    flex: 1; padding: 10px; text-align: center;
+    border: 1.5px solid var(--border); border-radius: 10px;
+    cursor: pointer; transition: all 0.15s;
+    font-size: 13px; font-weight: 600; color: var(--text-muted);
+    background: var(--surface);
+  }
+  .fin-pill.active { background: rgba(245,200,66,0.08); border-color: var(--gold); color: var(--gold); }
+
+  .suggest-chip-wrapper {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px; margin-top: 10px;
+    display: none;
+    animation: fadeUp 0.3s ease forwards;
+  }
+
+  /* Animated number input */
+  .cgpa-visual {
+    display: flex; align-items: center; justify-content: center;
+    height: 60px; font-size: 36px; font-weight: 800;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: var(--gold); letter-spacing: -0.04em;
+    position: relative;
+  }
+  .cgpa-bar-container { height: 6px; background: var(--surface-high); border-radius: 99px; overflow: hidden; margin-top: 6px; }
+  .cgpa-bar { height: 100%; border-radius: 99px; transition: width 0.4s, background 0.4s; }
+
+  .step-number {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--gold); color: #000;
+    font-size: 12px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* Floating label effect */
+  .field-group { position: relative; }
+
+  /* Live preview strip */
+  .preview-strip {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px 24px;
+    display: flex; align-items: center; gap: 20px;
+    flex-wrap: wrap;
+  }
+  .preview-item { font-size: 13px; color: var(--text-muted); }
+  .preview-item strong { color: var(--text); font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:1200px;margin:0 auto;padding:60px 40px;">
+
+  <!-- Hero -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;margin-bottom:80px;">
+    <div class="animate-fadeUp">
+      <div class="badge badge-gold" style="margin-bottom:20px;">✦ SOFTEC 2026 — AI Hackathon</div>
+      <h1 class="hero-text">
+        Stop missing<br/>
+        <span class="accent">opportunities</span><br/>
+        that matter
+      </h1>
+      <p class="hero-sub" style="margin-top:24px;">
+        Paste your emails. Get a personalized ranked list of scholarships, internships, and competitions — with gap analysis, action plans, and auto-drafted cover letters.
+      </p>
+      <div style="margin-top:32px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);">
+          <span style="color:var(--mint);">●</span> Works in 30 seconds
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);">
+          <span style="color:var(--gold);">●</span> 7 AI-powered features
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);">
+          <span style="color:var(--ember);">●</span> Built for Pakistani students
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating stats card -->
+    <div class="animate-fadeUp delay-2">
+      <div class="glass-card" style="padding:28px;glow-gold;">
+        <div style="font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:16px;">Live Example Output</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(255,71,87,0.06);border:1px solid rgba(255,71,87,0.15);border-radius:10px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0;box-shadow:0 0 8px var(--red);"></div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);">HEC Merit Scholarship 2026</div>
+              <div style="font-size:11px;color:var(--red);font-weight:600;">Closes in 2 days · Score: 94/100</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(255,165,2,0.06);border:1px solid rgba(255,165,2,0.15);border-radius:10px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--yellow);flex-shrink:0;"></div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);">Google STEP Internship</div>
+              <div style="font-size:11px;color:var(--yellow);font-weight:600;">5 days left · Score: 81/100</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(46,213,115,0.06);border:1px solid rgba(46,213,115,0.15);border-radius:10px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);">LUMS Research Fellowship</div>
+              <div style="font-size:11px;color:var(--green);font-weight:600;">21 days left · Score: 73/100</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--text-dim);">
+          3 of 11 emails are real opportunities · 2 are spam · 1 expired
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Form -->
+  <div id="profile-form">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:36px;" class="animate-fadeUp delay-3">
+      <div class="step-number">1</div>
+      <h2 style="font-size:26px;font-weight:800;letter-spacing:-0.03em;">Build your profile</h2>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+      <span style="font-size:12px;color:var(--text-dim);">Takes 60 seconds</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;" class="animate-fadeUp delay-4">
+
+      <!-- Left Column -->
+      <div style="display:flex;flex-direction:column;gap:20px;">
+
+        <div class="profile-card">
+          <div class="section-heading">Basic Info</div>
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div>
+              <label class="field-label">Full Name</label>
+              <input class="input-field" type="text" id="name" placeholder="e.g. Ali Hassan" oninput="updatePreview()"/>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div>
+                <label class="field-label">Degree</label>
+                <input class="input-field" type="text" id="degree" placeholder="BS / MS / PhD" oninput="updatePreview()"/>
+              </div>
+              <div>
+                <label class="field-label">Program</label>
+                <input class="input-field" type="text" id="program" placeholder="Computer Science" oninput="updatePreview()"/>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div>
+                <label class="field-label">Semester</label>
+                <input class="input-field" type="number" id="semester" min="1" max="8" placeholder="e.g. 5" oninput="updatePreview()"/>
+              </div>
+              <div>
+                <label class="field-label">Location Preference</label>
+                <input class="input-field" type="text" id="location" placeholder="Lahore / Remote" oninput="updatePreview()"/>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CGPA Card with visual -->
+        <div class="profile-card">
+          <div class="section-heading">Academic Standing</div>
+          <label class="field-label">CGPA (out of 4.0)</label>
+          <div class="cgpa-visual" id="cgpa-display">—</div>
+          <div class="cgpa-bar-container"><div class="cgpa-bar" id="cgpa-bar" style="width:0%;background:var(--text-dim);"></div></div>
+          <input class="input-field" type="range" id="cgpa-slider" min="0" max="4" step="0.01" value="0"
+            oninput="updateCgpa(this.value)"
+            style="width:100%;margin-top:14px;accent-color:var(--gold);background:transparent;border:none;padding:0;box-shadow:none;cursor:pointer;"/>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim);margin-top:4px;">
+            <span>0.0</span><span>1.0</span><span>2.0</span><span>3.0</span><span>4.0</span>
+          </div>
+          <input type="hidden" id="cgpa" value="0"/>
+        </div>
+
+        <!-- Financial need -->
+        <div class="profile-card">
+          <div class="section-heading">Financial Need</div>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Do you require funding or financial support?</p>
+          <div style="display:flex;gap:8px;">
+            <button class="fin-pill" id="fin-yes" onclick="setFin(true)">💰 Yes, I need funding</button>
+            <button class="fin-pill active" id="fin-no" onclick="setFin(false)">✓ No financial requirement</button>
+          </div>
+        </div>
+
+      </div><!-- end left col -->
+
+      <!-- Right Column -->
+      <div style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Skills -->
+        <div class="profile-card">
+          <div class="section-heading">Skills & Expertise</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <input class="input-field" type="text" id="skills-input" placeholder="Type a skill and press Enter" style="flex:1;"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();addSkillFromInput();}"/>
+            <button class="btn-ghost" onclick="suggestSkills()" style="white-space:nowrap;display:flex;align-items:center;gap:6px;">
+              <span id="suggest-spinner" class="spinner" style="display:none;width:14px;height:14px;"></span>
+              ✦ Auto-suggest
+            </button>
+          </div>
+          <div id="skills-tags" style="min-height:40px;display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;"></div>
+          <div id="suggest-panel" class="suggest-chip-wrapper">
+            <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;font-weight:700;">Suggested for your profile</div>
+            <div id="suggest-chips"></div>
+          </div>
+        </div>
+
+        <!-- Opportunity Types -->
+        <div class="profile-card">
+          <div class="section-heading">Preferred Opportunity Types</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="type-option" onclick="toggleType(this,'scholarship')"><span class="type-icon">🎓</span> Scholarship</div>
+            <div class="type-option" onclick="toggleType(this,'internship')"><span class="type-icon">💼</span> Internship</div>
+            <div class="type-option" onclick="toggleType(this,'fellowship')"><span class="type-icon">🌟</span> Fellowship</div>
+            <div class="type-option" onclick="toggleType(this,'competition')"><span class="type-icon">🏆</span> Competition</div>
+            <div class="type-option" onclick="toggleType(this,'research')"><span class="type-icon">🔬</span> Research</div>
+            <div class="type-option" onclick="toggleType(this,'job')"><span class="type-icon">🚀</span> Job / Full-time</div>
+          </div>
+        </div>
+
+        <!-- Experience -->
+        <div class="profile-card">
+          <div class="section-heading">Past Experience</div>
+          <textarea class="input-field" id="experience" rows="4"
+            placeholder="e.g. Research assistant for 1 semester, built a web app, won a coding competition at FAST..."></textarea>
+        </div>
+
+      </div><!-- end right col -->
+    </div><!-- end grid -->
+
+    <!-- Live Preview Strip -->
+    <div class="preview-strip animate-fadeUp delay-5" style="margin-top:24px;" id="preview-strip">
+      <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;width:100%;margin-bottom:4px;">Profile Preview</div>
+      <div class="preview-item">👤 <strong id="prev-name">—</strong></div>
+      <div class="preview-item">🎓 <strong id="prev-degree">—</strong></div>
+      <div class="preview-item">📊 CGPA <strong id="prev-cgpa">—</strong></div>
+      <div class="preview-item">📍 <strong id="prev-loc">—</strong></div>
+      <div class="preview-item" id="prev-skills-wrap">🧠 <strong id="prev-skills">—</strong></div>
+    </div>
+
+    <!-- CTA -->
+    <div style="margin-top:32px;display:flex;align-items:center;justify-content:space-between;" class="animate-fadeUp delay-5">
+      <p style="font-size:13px;color:var(--text-dim);">Next: paste your emails and let the AI work</p>
+      <button class="btn-primary" onclick="goToAnalyze()" style="font-size:15px;padding:16px 36px;">
+        Continue to Emails <span style="font-size:18px;">→</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let financialNeed = false;
+let selectedTypes = new Set();
+let selectedSkills = new Set();
+
+// CGPA slider
+function updateCgpa(val) {
+  const v = parseFloat(val);
+  document.getElementById('cgpa').value = v;
+  document.getElementById('cgpa-display').textContent = v.toFixed(2);
+  const pct = (v / 4) * 100;
+  const bar = document.getElementById('cgpa-bar');
+  bar.style.width = pct + '%';
+  bar.style.background = v >= 3.5 ? 'var(--green)' : v >= 3.0 ? 'var(--gold)' : v >= 2.5 ? 'var(--yellow)' : 'var(--red)';
+  document.getElementById('cgpa-display').style.color = v >= 3.5 ? 'var(--green)' : v >= 3.0 ? 'var(--gold)' : v >= 2.5 ? 'var(--yellow)' : 'var(--red)';
+  updatePreview();
+}
+
+// Financial
+function setFin(val) {
+  financialNeed = val;
+  document.getElementById('fin-yes').classList.toggle('active', val);
+  document.getElementById('fin-no').classList.toggle('active', !val);
+}
+
+// Type toggle
+function toggleType(el, type) {
+  el.classList.toggle('selected');
+  if (el.classList.contains('selected')) selectedTypes.add(type);
+  else selectedTypes.delete(type);
+}
+
+// Skills
+function addSkillFromInput() {
+  const inp = document.getElementById('skills-input');
+  const val = inp.value.trim();
+  if (val) { addSkill(val); inp.value = ''; }
+}
+function addSkill(skill) {
+  if (selectedSkills.has(skill.toLowerCase())) return;
+  selectedSkills.add(skill.toLowerCase());
+  const tag = document.createElement('span');
+  tag.className = 'skill-tag selected';
+  tag.innerHTML = `${skill} <span class="remove" onclick="removeSkill('${skill.toLowerCase()}',this.parentElement)">✕</span>`;
+  document.getElementById('skills-tags').appendChild(tag);
+  updatePreview();
+}
+function removeSkill(skill, el) {
+  selectedSkills.delete(skill);
+  el.remove();
+  updatePreview();
+}
+
+// Suggest skills
+async function suggestSkills() {
+  const degree = document.getElementById('degree').value.trim();
+  const program = document.getElementById('program').value.trim();
+  const semester = parseInt(document.getElementById('semester').value) || 1;
+  if (!degree && !program) { showToast('Fill in Degree and Program first', '⚠'); return; }
+
+  const spin = document.getElementById('suggest-spinner');
+  spin.style.display = 'inline-block';
+  try {
+    const res = await fetch('/infer_skills', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({degree,program,semester}) });
+    const data = await res.json();
+    const panel = document.getElementById('suggest-panel');
+    const chips = document.getElementById('suggest-chips');
+    chips.innerHTML = '';
+    (data.suggested_skills || []).forEach(s => {
+      const chip = document.createElement('span');
+      chip.className = 'skill-tag' + (selectedSkills.has(s.toLowerCase()) ? ' selected' : '');
+      chip.textContent = s;
+      chip.onclick = () => { addSkill(s); chip.classList.add('selected'); };
+      chips.appendChild(chip);
+    });
+    panel.style.display = 'block';
+    showToast(`${data.suggested_skills.length} skills suggested based on your profile`, '✦');
+  } catch(e) { showToast('Could not fetch suggestions', '⚠'); }
+  spin.style.display = 'none';
+}
+
+// Preview
+function updatePreview() {
+  document.getElementById('prev-name').textContent = document.getElementById('name').value || '—';
+  const deg = document.getElementById('degree').value;
+  const prog = document.getElementById('program').value;
+  const sem = document.getElementById('semester').value;
+  document.getElementById('prev-degree').textContent = [deg,prog,sem?`Sem ${sem}`:''].filter(Boolean).join(' · ') || '—';
+  document.getElementById('prev-cgpa').textContent = document.getElementById('cgpa').value || '—';
+  document.getElementById('prev-loc').textContent = document.getElementById('location').value || '—';
+  document.getElementById('prev-skills').textContent = selectedSkills.size ? [...selectedSkills].slice(0,4).join(', ') + (selectedSkills.size > 4 ? ` +${selectedSkills.size-4}` : '') : '—';
+}
+
+// Save & go
+function goToAnalyze() {
+  const profile = {
+    name: document.getElementById('name').value.trim(),
+    degree: document.getElementById('degree').value.trim(),
+    program: document.getElementById('program').value.trim(),
+    semester: parseInt(document.getElementById('semester').value) || 1,
+    cgpa: parseFloat(document.getElementById('cgpa').value) || 0,
+    skills: [...selectedSkills],
+    preferred_types: [...selectedTypes],
+    financial_need: financialNeed,
+    location_preference: document.getElementById('location').value.trim(),
+    past_experience: document.getElementById('experience').value.trim()
+  };
+  sessionStorage.setItem('profile', JSON.stringify(profile));
+  window.location.href = '/analyze';
+}
+
+// Restore if returning
+window.addEventListener('load', () => {
+  const saved = sessionStorage.getItem('profile');
+  if (!saved) return;
+  const p = JSON.parse(saved);
+  if (p.name) document.getElementById('name').value = p.name;
+  if (p.degree) document.getElementById('degree').value = p.degree;
+  if (p.program) document.getElementById('program').value = p.program;
+  if (p.semester) document.getElementById('semester').value = p.semester;
+  if (p.cgpa) { document.getElementById('cgpa-slider').value = p.cgpa; updateCgpa(p.cgpa); }
+  if (p.location_preference) document.getElementById('location').value = p.location_preference;
+  if (p.past_experience) document.getElementById('experience').value = p.past_experience;
+  if (p.financial_need) setFin(true);
+  (p.skills || []).forEach(s => addSkill(s));
+  (p.preferred_types || []).forEach(t => {
+    const els = document.querySelectorAll('.type-option');
+    els.forEach(el => { if(el.onclick.toString().includes(`'${t}'`)) { el.classList.add('selected'); selectedTypes.add(t); }});
+  });
+  updatePreview();
+});
+</script>
+{% endblock %}

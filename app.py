@@ -16,31 +16,45 @@ EXTRACTION_PROMPT = """You are an expert email analyst for university students i
 Analyze each email in the batch below and return a JSON array.
 
 For each email return an object with these exact keys:
-- "subject": string — the email subject or best title
+- "subject": string
 - "sender_email": string (or "unknown")
-- "is_opportunity": boolean — true only if this is a real actionable opportunity
-- "rejection_reason": string — why it is not an opportunity (if applicable), else ""
-- "type": one of: "scholarship", "internship", "fellowship", "competition", "admission", "research", "job", "other", "not_opportunity"
-- "deadline": string — YYYY-MM-DD format if found, else "unknown"
-- "eligibility": string — full eligibility criteria
+- "is_opportunity": boolean
+- "rejection_reason": string (if not opportunity, else "")
+- "type": one of: "scholarship","internship","fellowship","competition","admission","research","job","other","not_opportunity"
+- "deadline": string YYYY-MM-DD format if found, else "unknown"
+- "eligibility": string
 - "min_cgpa": number or null
 - "required_skills": array of strings
-- "required_docs": array of strings (e.g. ["CV", "Transcript", "SOP"])
+- "required_docs": array of strings
 - "application_link": string (or "")
 - "contact_info": string (or "")
-- "is_funded": boolean — true if scholarship/stipend/funding is mentioned
-- "location": string — "remote", "online", or city name (or "unknown")
+- "is_funded": boolean
+- "location": string (or "unknown")
 - "experience_required": string (or "")
-- "evidence_quote": string — one key phrase from the email (max 20 words) that proves it is an opportunity
-- "summary": string — exactly 2 sentences describing the opportunity
-- "similar_opportunity_hint": string — if deadline is expired or student unlikely to qualify, suggest what type to look for next. Else ""
-- "readiness_tip": string — one practical sentence telling the student what to do RIGHT NOW to prepare. Else ""
+- "evidence_quote": string (one key phrase max 20 words)
+- "summary": string (2 sentences)
+- "similar_opportunity_hint": string (if expired or unlikely to qualify, suggest next steps, else "")
+- "readiness_tip": string (one practical sentence for right now, else "")
 
-Return ONLY a raw JSON array. No markdown. No explanation. No code fences. Start with [ and end with ]."""
+Return ONLY a raw JSON array. No markdown. No explanation. Start with [ end with ]."""
+
+
+# ── Page routes ───────────────────────────────────────────────────────────────
 
 @app.route("/")
-def index():
-    return render_template("index.html")
+def home():
+    return render_template("index.html", active_page="home")
+
+@app.route("/analyze")
+def analyze_page():
+    return render_template("analyze.html", active_page="analyze")
+
+@app.route("/results")
+def results_page():
+    return render_template("results.html", active_page="results")
+
+
+# ── API routes ────────────────────────────────────────────────────────────────
 
 @app.route("/infer_skills", methods=["POST"])
 def infer_skills_route():
@@ -52,6 +66,7 @@ def infer_skills_route():
     )
     return jsonify(result)
 
+
 @app.route("/cover_letter", methods=["POST"])
 def cover_letter_route():
     data = request.json
@@ -62,6 +77,7 @@ def cover_letter_route():
         return jsonify({"cover_letter": letter})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
@@ -92,7 +108,6 @@ def analyze():
                 raw = raw[start:]
 
         opportunities = json.loads(raw)
-
         scored = []
         rejected = []
         expired_with_hints = []
@@ -136,15 +151,14 @@ def analyze():
 
         # WOW #3 — If Not This Then What
         for opp in scored:
-            fit = opp.get("fit_score", 0)
-            if fit < 40 and len(scored) > 1:
-                alternates = [o for o in scored if o.get("rank") != opp.get("rank") and o.get("fit_score", 0) > fit]
+            if opp.get("fit_score", 0) < 40 and len(scored) > 1:
+                alternates = [o for o in scored if o.get("rank") != opp.get("rank") and o.get("fit_score", 0) > opp.get("fit_score", 0)]
                 if alternates:
-                    best_alt = max(alternates, key=lambda x: x.get("fit_score", 0))
+                    best = max(alternates, key=lambda x: x.get("fit_score", 0))
                     opp["if_not_this"] = {
-                        "subject": best_alt.get("subject", ""),
-                        "rank": best_alt.get("rank"),
-                        "fit_score": best_alt.get("fit_score")
+                        "subject": best.get("subject", ""),
+                        "rank": best.get("rank"),
+                        "fit_score": best.get("fit_score")
                     }
 
         return jsonify({
@@ -159,9 +173,10 @@ def analyze():
         })
 
     except json.JSONDecodeError as e:
-        return jsonify({"error": f"AI response parse error: {str(e)}"}), 500
+        return jsonify({"error": f"AI parse error: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)
