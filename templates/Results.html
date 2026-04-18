@@ -1,0 +1,639 @@
+{% extends "base.html" %}
+{% block title %}OpportuNest — Your Priority Board{% endblock %}
+{% block progress %}100{% endblock %}
+
+{% block extra_styles %}
+<style>
+  /* One Task Today */
+  .ott-card {
+    background: linear-gradient(135deg, var(--surface-raised) 0%, rgba(245,200,66,0.04) 100%);
+    border: 1px solid rgba(245,200,66,0.2);
+    border-radius: 24px; padding: 32px;
+    position: relative; overflow: hidden;
+  }
+  .ott-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--gold), var(--ember));
+  }
+  .ott-card::after {
+    content: '✦'; position: absolute; right: 32px; top: 28px;
+    font-size: 64px; color: rgba(245,200,66,0.05); line-height: 1;
+    pointer-events: none;
+  }
+  .urgency-display {
+    font-size: 48px; font-weight: 800; line-height: 1;
+    letter-spacing: -0.04em;
+  }
+
+  /* Stat cards */
+  .stat-box {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px 24px;
+    transition: all 0.2s;
+    cursor: default;
+  }
+  .stat-box:hover { transform: translateY(-3px); border-color: var(--border-bright); }
+  .stat-number {
+    font-size: 40px; font-weight: 800; line-height: 1;
+    letter-spacing: -0.04em;
+    animation: countUp 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+
+  /* Opportunity cards */
+  .opp-card {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--border);
+    border-radius: 20px; padding: 24px;
+    transition: all 0.25s;
+    position: relative;
+  }
+  .opp-card:hover {
+    border-color: var(--border-bright);
+    border-left-color: inherit;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  }
+  .heat-red .opp-card { border-left-color: var(--red); }
+  .opp-card.heat-red { border-left-color: var(--red); }
+  .opp-card.heat-yellow { border-left-color: var(--yellow); }
+  .opp-card.heat-green { border-left-color: var(--green); }
+  .opp-card.heat-expired { border-left-color: var(--gray); opacity: 0.75; }
+
+  .rank-circle {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; flex-shrink: 0;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .rank-1 { background: linear-gradient(135deg, var(--gold), var(--ember)); color: #000; box-shadow: 0 0 16px rgba(245,200,66,0.4); }
+  .rank-2 { background: linear-gradient(135deg, #a0a0b8, #6c6c88); color: #fff; }
+  .rank-3 { background: linear-gradient(135deg, #cd7f32, #8b5513); color: #fff; }
+  .rank-other { background: var(--surface-high); color: var(--text-muted); border: 1px solid var(--border); }
+
+  /* Fit ring SVG */
+  .fit-ring-container { position: relative; width: 72px; height: 72px; flex-shrink: 0; }
+  .fit-ring-label {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .fit-ring-score { font-size: 17px; font-weight: 800; line-height: 1; }
+  .fit-ring-sub { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 1px; }
+
+  /* Gap pills */
+  .gap-blocker { background: rgba(255,71,87,0.1); color: var(--red); border: 1px solid rgba(255,71,87,0.2); border-radius: 99px; padding: 3px 12px; font-size: 11px; font-weight: 600; }
+  .gap-preparable { background: rgba(255,165,2,0.1); color: var(--yellow); border: 1px solid rgba(255,165,2,0.2); border-radius: 99px; padding: 3px 12px; font-size: 11px; font-weight: 600; }
+  .gap-minor { background: var(--surface-high); color: var(--text-muted); border: 1px solid var(--border); border-radius: 99px; padding: 3px 12px; font-size: 11px; font-weight: 500; }
+  .fit-reason-chip { background: rgba(0,229,160,0.08); color: var(--mint); border: 1px solid rgba(0,229,160,0.2); border-radius: 99px; padding: 3px 12px; font-size: 11px; font-weight: 500; }
+
+  /* Collapsible */
+  .collapse-body { overflow: hidden; transition: max-height 0.4s cubic-bezier(0.22,1,0.36,1), opacity 0.3s; }
+  .collapse-body.closed { max-height: 0 !important; opacity: 0; }
+  .collapse-toggle { background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); padding: 4px 0; font-family: 'Plus Jakarta Sans', sans-serif; transition: color 0.15s; }
+  .collapse-toggle:hover { color: var(--text); }
+
+  /* Cover letter */
+  .cover-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+    font-size: 13px; line-height: 1.8; color: var(--text-muted);
+    white-space: pre-wrap; max-height: 280px; overflow-y: auto;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  /* If not this banner */
+  .if-not-banner {
+    background: rgba(255,165,2,0.06); border: 1px solid rgba(255,165,2,0.2);
+    border-radius: 10px; padding: 10px 14px;
+    font-size: 12px; color: var(--yellow);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* Expired section */
+  .expired-card {
+    background: var(--surface-raised); border: 1px solid var(--border);
+    border-left: 4px solid var(--gray);
+    border-radius: 14px; padding: 16px 20px;
+    opacity: 0.8;
+  }
+
+  /* Action plan */
+  .action-plan { background: var(--surface); border-radius: 12px; padding: 16px; }
+
+  /* Score breakdown row */
+  .score-breakdown { display: flex; gap: 16px; flex-wrap: wrap; }
+  .score-pill {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--text-dim);
+    background: var(--surface-high); border-radius: 99px;
+    padding: 4px 10px;
+  }
+  .score-pill-val { font-weight: 700; color: var(--text-muted); }
+
+  /* Tabs */
+  .tab-btn {
+    padding: 8px 20px; border-radius: 10px; border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    transition: all 0.15s; color: var(--text-muted);
+    background: transparent;
+  }
+  .tab-btn.active { background: var(--surface-raised); color: var(--text); border: 1px solid var(--border); }
+
+  /* Urgency dot pulse */
+  .urgency-pulse {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    position: relative;
+  }
+  .urgency-pulse::after {
+    content: ''; position: absolute; inset: -4px; border-radius: 50%;
+    border: 2px solid currentColor; opacity: 0;
+    animation: ringPulse 2s ease-out infinite;
+  }
+  @keyframes ringPulse {
+    0% { transform: scale(0.8); opacity: 0.5; }
+    100% { transform: scale(2); opacity: 0; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:1200px;margin:0 auto;padding:50px 40px;" id="app">
+
+  <!-- No results fallback -->
+  <div id="no-results" style="display:none;text-align:center;padding:100px 40px;">
+    <div style="font-size:64px;margin-bottom:20px;">📭</div>
+    <h2 style="font-size:28px;font-weight:800;margin-bottom:12px;">No results yet</h2>
+    <p style="color:var(--text-muted);margin-bottom:28px;">Go back and analyze your emails first.</p>
+    <a href="/analyze" class="btn-primary" style="text-decoration:none;display:inline-flex;">← Analyze Emails</a>
+  </div>
+
+  <!-- Main Results -->
+  <div id="results-root" style="display:none;">
+
+    <!-- Header row -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:40px;" class="animate-fadeUp">
+      <div>
+        <div class="badge badge-mint" style="margin-bottom:12px;">✦ Analysis Complete</div>
+        <h1 style="font-size:36px;font-weight:800;letter-spacing:-0.04em;" id="result-heading">Your Priority Board</h1>
+        <p style="font-size:14px;color:var(--text-muted);margin-top:6px;" id="result-sub">—</p>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-ghost" onclick="window.location.href='/analyze'">← Re-analyze</button>
+        <button class="btn-primary" onclick="window.location.href='/'">New Analysis</button>
+      </div>
+    </div>
+
+    <!-- WOW #1: One Task Today -->
+    <div class="ott-card animate-fadeUp delay-1" id="ott-section" style="margin-bottom:32px;">
+      <div style="display:flex;align-items:flex-start;gap:28px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:260px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold);margin-bottom:10px;">🎯 Your One Task Today</div>
+          <h2 style="font-size:24px;font-weight:800;letter-spacing:-0.03em;margin-bottom:14px;line-height:1.2;" id="ott-title">—</h2>
+          <div class="urgency-display" id="ott-urgency" style="margin-bottom:12px;">—</div>
+          <p style="font-size:14px;color:var(--text-muted);margin-bottom:8px;" id="ott-fit">—</p>
+          <p style="font-size:13px;color:var(--text-dim);font-style:italic;margin-bottom:16px;" id="ott-tip"></p>
+          <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:20px;" id="ott-step">—</div>
+          <div id="ott-docs" style="margin-bottom:20px;"></div>
+          <div id="ott-apply"></div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;min-width:200px;" id="ott-score-box">
+          <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;font-weight:700;">Score Breakdown</div>
+          <div id="ott-score-breakdown"></div>
+        </div>
+      </div>
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);font-size:11px;color:var(--text-dim);">
+        OpportuNest ranked this #1 based on urgency + profile fit + credibility + completeness
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:36px;" class="animate-fadeUp delay-2">
+      <div class="stat-box" style="border-top:2px solid rgba(245,200,66,0.4);">
+        <div class="stat-number" style="color:var(--gold);" id="s-total">0</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">📬 Total Scanned</div>
+      </div>
+      <div class="stat-box" style="border-top:2px solid rgba(0,229,160,0.4);">
+        <div class="stat-number" style="color:var(--mint);" id="s-opps">0</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">✅ Opportunities</div>
+      </div>
+      <div class="stat-box" style="border-top:2px solid rgba(87,96,111,0.4);">
+        <div class="stat-number" style="color:var(--text-muted);" id="s-rej">0</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">🗑 Noise / Spam</div>
+      </div>
+      <div class="stat-box" style="border-top:2px solid rgba(255,71,87,0.4);">
+        <div class="stat-number" style="color:var(--red);" id="s-exp">0</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">⏰ Missed</div>
+      </div>
+    </div>
+
+    <!-- Priority Board -->
+    <div class="animate-fadeUp delay-3">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h2 style="font-size:24px;font-weight:800;letter-spacing:-0.03em;">Priority Board</h2>
+          <p style="font-size:13px;color:var(--text-muted);margin-top:2px;">Ranked by urgency · fit · credibility</p>
+        </div>
+        <div style="display:flex;gap:6px;" id="tab-bar">
+          <button class="tab-btn active" onclick="setTab('all',this)">All</button>
+          <button class="tab-btn" onclick="setTab('urgent',this)">🔴 Urgent</button>
+          <button class="tab-btn" onclick="setTab('high-fit',this)">⭐ Best Fit</button>
+        </div>
+      </div>
+      <div id="opps-list" style="display:flex;flex-direction:column;gap:16px;"></div>
+    </div>
+
+    <!-- Expired / Missed -->
+    <div id="expired-section" style="display:none;margin-top:40px;" class="animate-fadeUp">
+      <h3 style="font-size:18px;font-weight:700;color:var(--yellow);margin-bottom:16px;">⏰ You Missed These — But Here's What's Next</h3>
+      <div id="expired-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
+    <!-- Rejected -->
+    <div id="rejected-wrap" style="display:none;margin-top:32px;">
+      <button class="collapse-toggle" id="rej-toggle" onclick="toggleRejected()" style="width:100%;justify-content:center;padding:12px;background:var(--surface-raised);border-radius:10px;border:1px solid var(--border);">
+        <span id="rej-toggle-label">▼ Show rejected / noise emails</span>
+      </button>
+      <div id="rejected-list" style="display:none;flex-direction:column;gap:8px;margin-top:10px;"></div>
+    </div>
+
+  </div><!-- end results-root -->
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allOpps = [], profile = {}, results = {};
+let currentTab = 'all';
+
+window.addEventListener('load', () => {
+  const r = sessionStorage.getItem('results');
+  const p = sessionStorage.getItem('profile');
+  if (!r) { document.getElementById('no-results').style.display = 'block'; return; }
+  results = JSON.parse(r);
+  profile = JSON.parse(p || '{}');
+  allOpps = results.opportunities || [];
+  document.getElementById('results-root').style.display = 'block';
+  renderAll();
+});
+
+function renderAll() {
+  // heading
+  const name = profile.name ? profile.name.split(' ')[0] : 'Your';
+  document.getElementById('result-heading').textContent = `${name}'s Priority Board`;
+  document.getElementById('result-sub').textContent =
+    `${results.opportunities_found} opportunities found in ${results.total_emails} emails · Analyzed just now`;
+
+  // stats
+  animateCount('s-total', results.total_emails || 0);
+  animateCount('s-opps', results.opportunities_found || 0);
+  animateCount('s-rej', results.rejected_count || 0);
+  animateCount('s-exp', results.expired_count || 0);
+
+  // OTT
+  renderOTT(results.one_task_today);
+
+  // Opps
+  renderOpps(allOpps);
+
+  // Expired
+  if ((results.expired || []).length > 0) {
+    document.getElementById('expired-section').style.display = 'block';
+    const list = document.getElementById('expired-list');
+    list.innerHTML = '';
+    results.expired.forEach(e => list.appendChild(buildExpiredCard(e)));
+  }
+
+  // Rejected
+  if ((results.rejected || []).length > 0) {
+    document.getElementById('rejected-wrap').style.display = 'block';
+    document.getElementById('rej-toggle-label').textContent = `▼ Show ${results.rejected.length} rejected / noise emails`;
+    const list = document.getElementById('rejected-list');
+    list.innerHTML = '';
+    results.rejected.forEach(r => {
+      const d = document.createElement('div');
+      d.style.cssText = 'background:var(--surface-raised);border:1px solid var(--border);border-radius:10px;padding:12px 16px;opacity:0.6;';
+      d.innerHTML = `<div style="font-size:13px;font-weight:600;color:var(--text-muted);">${esc(r.subject||'No subject')}</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:3px;">${esc(r.sender_email||'')} ${r.rejection_reason?`· <em>${esc(r.rejection_reason)}</em>`:''}`;
+      list.appendChild(d);
+    });
+  }
+}
+
+// Animate count up
+function animateCount(id, target) {
+  const el = document.getElementById(id);
+  let start = 0;
+  const step = Math.ceil(target / 20);
+  const timer = setInterval(() => {
+    start = Math.min(start + step, target);
+    el.textContent = start;
+    if (start >= target) clearInterval(timer);
+  }, 40);
+}
+
+// One Task Today
+function renderOTT(ott) {
+  if (!ott) { document.getElementById('ott-section').style.display = 'none'; return; }
+  const color = heatColor(ott.heat);
+  document.getElementById('ott-section').style.borderColor = `rgba(${hexToRgb(color)},0.3)`;
+  document.getElementById('ott-title').textContent = ott.subject || '—';
+  document.getElementById('ott-urgency').innerHTML = `<span style="color:${color};">${esc(ott.urgency_label)}</span>`;
+  document.getElementById('ott-fit').textContent = ott.fit_score ? `You are a ${ott.fit_score}% match for this opportunity` : '';
+  document.getElementById('ott-tip').textContent = ott.readiness_tip ? `💡 ${ott.readiness_tip}` : '';
+  document.getElementById('ott-step').textContent = ott.next_step ? `→ ${ott.next_step}` : '';
+
+  const docsEl = document.getElementById('ott-docs');
+  if ((ott.required_docs||[]).length) {
+    docsEl.innerHTML = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;">Required Documents</div>' +
+      (ott.required_docs||[]).map(d => `<div class="check-item"><div class="check-box"></div><span>📄 ${esc(d)}</span></div>`).join('');
+  }
+  if (ott.application_link) {
+    document.getElementById('ott-apply').innerHTML = `<a href="${esc(ott.application_link)}" target="_blank"><button class="btn-primary">Apply Now →</button></a>`;
+  }
+
+  // Score breakdown
+  if (allOpps.length > 0) {
+    const top = allOpps[0];
+    document.getElementById('ott-score-breakdown').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${scoreRow('Fit Score', top.fit_score, 'var(--mint)')}
+        ${scoreRow('Urgency', top.urgency_score, 'var(--red)')}
+        ${scoreRow('Credibility', top.credibility_score, 'var(--gold)')}
+        ${scoreRow('Completeness', top.completeness_score, 'var(--text-muted)')}
+      </div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;color:var(--text-dim);">Total Score</span>
+        <span style="font-size:20px;font-weight:800;color:var(--gold);">${top.total_score}/100</span>
+      </div>`;
+  }
+}
+
+function scoreRow(label, val, color) {
+  return `<div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px;">
+      <span style="color:var(--text-dim);">${label}</span>
+      <span style="color:${color};font-weight:700;">${val}</span>
+    </div>
+    <div class="score-track"><div class="score-fill" style="width:${val}%;background:${color};"></div></div>
+  </div>`;
+}
+
+// Tabs
+function setTab(tab, el) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  let filtered = [...allOpps];
+  if (tab === 'urgent') filtered = filtered.filter(o => o.heat === 'red');
+  else if (tab === 'high-fit') filtered = [...allOpps].sort((a,b) => b.fit_score - a.fit_score);
+  renderOpps(filtered);
+}
+
+function renderOpps(opps) {
+  const list = document.getElementById('opps-list');
+  list.innerHTML = '';
+  if (!opps.length) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim);">No opportunities in this category</div>';
+    return;
+  }
+  opps.forEach((opp, i) => {
+    const card = buildOppCard(opp, i);
+    list.appendChild(card);
+  });
+}
+
+// Opportunity card
+function buildOppCard(opp, idx) {
+  const color = heatColor(opp.heat);
+  const rankClass = opp.rank <= 3 ? `rank-${opp.rank}` : 'rank-other';
+  const fitColor = opp.fit_score >= 70 ? 'var(--mint)' : opp.fit_score >= 40 ? 'var(--yellow)' : 'var(--red)';
+  const circ = 2 * Math.PI * 28;
+  const offset = circ - (opp.fit_score / 100) * circ;
+
+  const gapPills = (opp.gaps||[]).map(g => {
+    const cls = g.severity === 'blocker' ? 'gap-blocker' : g.severity === 'preparable' ? 'gap-preparable' : 'gap-minor';
+    const icon = g.severity === 'blocker' ? '🔴' : g.severity === 'preparable' ? '🟡' : '⚪';
+    return `<span class="${cls}">${icon} ${esc(g.detail)}</span>`;
+  }).join('');
+
+  const fitReasons = (opp.fit_reasons||[]).map(r =>
+    `<span class="fit-reason-chip">✓ ${esc(r)}</span>`).join('');
+
+  // Checklist items
+  const checkItems = [];
+  checkItems.push('Read full details and verify all eligibility requirements');
+  (opp.required_docs||[]).forEach(d => checkItems.push(`📄 Prepare: ${d}`));
+  if (opp.application_link) checkItems.push(`🔗 Apply: ${opp.application_link}`);
+  if (opp.days_left != null && opp.days_left > 0) checkItems.push(`⏰ Set reminder ${Math.max(1,opp.days_left-1)} days before deadline`);
+  if (opp.contact_info) checkItems.push(`📧 Contact: ${opp.contact_info}`);
+
+  const card = document.createElement('div');
+  card.className = `opp-card heat-${opp.heat} animate-fadeUp`;
+  card.style.animationDelay = `${idx * 0.06}s`;
+  card.style.opacity = '0';
+
+  const isRank1 = opp.rank === 1;
+
+  card.innerHTML = `
+    <!-- Row 1: Rank + Title + Type -->
+    <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px;">
+      <div class="rank-circle ${rankClass}">${opp.rank}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:16px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:8px;">${esc(opp.subject)}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="badge badge-muted" style="text-transform:capitalize;">${esc(opp.type)}</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:${color};">
+            <span class="urgency-pulse" style="background:${color};color:${color};"></span>
+            ${esc(opp.urgency_label)}
+          </span>
+          ${opp.is_funded ? '<span class="badge badge-mint">💰 Funded</span>' : ''}
+          ${opp.location && opp.location !== 'unknown' ? `<span class="badge badge-muted">📍 ${esc(opp.location)}</span>` : ''}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:22px;font-weight:800;color:var(--gold);">${opp.total_score}</div>
+        <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.08em;">/100</div>
+      </div>
+    </div>
+
+    <!-- Score bar -->
+    <div style="margin-bottom:10px;">
+      <div class="score-track"><div class="score-fill" style="width:${opp.total_score}%;"></div></div>
+    </div>
+
+    <!-- Score pills -->
+    <div class="score-breakdown" style="margin-bottom:14px;">
+      <span class="score-pill">Fit <span class="score-pill-val" style="color:${fitColor};">${opp.fit_score}</span></span>
+      <span class="score-pill">Urgency <span class="score-pill-val">${opp.urgency_score}</span></span>
+      <span class="score-pill">Credibility <span class="score-pill-val">${opp.credibility_score}</span></span>
+      <span class="score-pill">Complete <span class="score-pill-val">${opp.completeness_score}</span></span>
+    </div>
+
+    ${opp.evidence_quote ? `<div style="font-size:13px;color:var(--text-dim);font-style:italic;padding:10px 14px;background:var(--surface);border-radius:8px;border-left:3px solid var(--border-bright);margin-bottom:14px;">"${esc(opp.evidence_quote)}"</div>` : ''}
+
+    <!-- WOW #2: Fit Analysis -->
+    <div>
+      <button class="collapse-toggle" onclick="toggleSection('fit-${opp.rank}', this)">
+        <span id="fit-arrow-${opp.rank}">${isRank1 ? '▲' : '▼'}</span>
+        Fit Analysis — ${opp.fit_score}/100
+        ${opp.gaps && opp.gaps.length ? `<span class="badge badge-red" style="margin-left:6px;font-size:10px;">${opp.gaps.length} gap${opp.gaps.length>1?'s':''}</span>` : '<span class="badge badge-mint" style="margin-left:6px;font-size:10px;">✓ Qualified</span>'}
+      </button>
+      <div class="collapse-body ${isRank1 ? '' : 'closed'}" id="fit-${opp.rank}" style="max-height:${isRank1 ? '500px' : '0'};">
+        <div style="display:flex;align-items:flex-start;gap:20px;padding:16px;background:var(--surface);border-radius:12px;margin-top:10px;flex-wrap:wrap;">
+          <!-- Fit ring -->
+          <div class="fit-ring-container">
+            <svg viewBox="0 0 72 72" style="width:72px;height:72px;">
+              <circle cx="36" cy="36" r="28" fill="none" stroke="var(--surface-high)" stroke-width="6"/>
+              <circle cx="36" cy="36" r="28" fill="none" stroke="${fitColor}" stroke-width="6"
+                stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${offset}"
+                transform="rotate(-90 36 36)"
+                style="transition:stroke-dashoffset 1s ease;"/>
+            </svg>
+            <div class="fit-ring-label">
+              <div class="fit-ring-score" style="color:${fitColor};">${opp.fit_score}</div>
+              <div class="fit-ring-sub">FIT</div>
+            </div>
+          </div>
+          <div style="flex:1;min-width:180px;">
+            ${fitReasons ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${fitReasons}</div>` : ''}
+            ${opp.gaps && opp.gaps.length > 0 ? `
+              <div style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;font-weight:700;">What's holding you back:</div>
+              <div style="display:flex;flex-wrap:wrap;gap:5px;">${gapPills}</div>` :
+              `<div style="color:var(--mint);font-size:13px;font-weight:600;">✅ You meet all known requirements!</div>`}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WOW #3: If Not This Then What -->
+    ${opp.if_not_this ? `
+    <div class="if-not-banner" style="margin-top:12px;">
+      ⚡ Low match here? Try <strong>Rank #${opp.if_not_this.rank}: ${esc(opp.if_not_this.subject)}</strong>
+      <span style="margin-left:auto;font-weight:700;">${opp.if_not_this.fit_score}% fit →</span>
+    </div>` : ''}
+
+    <!-- Action Plan -->
+    <div style="margin-top:16px;">
+      <button class="collapse-toggle" onclick="toggleSection('action-${opp.rank}', this)">
+        <span>▼</span> Your Action Plan (${checkItems.length} steps)
+      </button>
+      <div class="collapse-body closed" id="action-${opp.rank}" style="max-height:0;">
+        <div class="action-plan" style="margin-top:10px;">
+          ${checkItems.map(item => `<div class="check-item"><div class="check-box"></div><span>${item.startsWith('🔗') ? item.replace(/🔗 Apply: (.+)/, `🔗 Apply: <a href="$1" target="_blank" style="color:var(--gold);text-decoration:none;font-weight:600;">$1</a>`) : esc(item)}</span></div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- WOW #6: Cover Letter (rank 1 only) -->
+    ${isRank1 ? `
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn-ghost" id="cover-btn-${opp.rank}" onclick="genCoverLetter(${opp.rank})" style="display:flex;align-items:center;gap:8px;">
+        <span id="cover-spinner-${opp.rank}" class="spinner" style="display:none;width:14px;height:14px;"></span>
+        ✉ Generate Personalized Cover Letter
+      </button>
+      <div id="cover-box-${opp.rank}" style="display:none;margin-top:12px;">
+        <div class="cover-box" id="cover-text-${opp.rank}"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
+          <button class="btn-ghost" style="padding:8px 16px;font-size:12px;" onclick="copyCover(${opp.rank})">📋 Copy</button>
+          <span id="copy-ok-${opp.rank}" style="display:none;font-size:12px;color:var(--mint);">✓ Copied!</span>
+        </div>
+      </div>
+    </div>` : ''}
+  `;
+
+  return card;
+}
+
+// Collapsed sections
+function toggleSection(id, btn) {
+  const el = document.getElementById(id);
+  const arrow = btn.querySelector('span');
+  const isOpen = !el.classList.contains('closed');
+  el.classList.toggle('closed', isOpen);
+  el.style.maxHeight = isOpen ? '0' : '600px';
+  if (arrow) arrow.textContent = isOpen ? '▼' : '▲';
+}
+
+// Expired
+function buildExpiredCard(opp) {
+  const card = document.createElement('div');
+  card.className = 'expired-card';
+  const ago = opp.days_left != null ? Math.abs(opp.days_left) : '?';
+  card.innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:700;color:var(--text-muted);text-decoration:line-through;">${esc(opp.subject||'')}</div>
+        <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="badge badge-red">Missed by ${ago} days</span>
+          <span style="font-size:12px;color:var(--text-dim);">${esc(opp.sender_email||'')}</span>
+        </div>
+        ${opp.similar_opportunity_hint ? `<div style="margin-top:8px;font-size:13px;color:var(--text-muted);font-style:italic;">💡 ${esc(opp.similar_opportunity_hint)}</div>` : ''}
+      </div>
+      <button class="btn-ghost" style="font-size:12px;padding:8px 14px;flex-shrink:0;" onclick="showToast('🔔 We will watch for similar opportunities!','🔔')">🔔 Watch for Similar</button>
+    </div>`;
+  return card;
+}
+
+// Rejected toggle
+let rejOpen = false;
+function toggleRejected() {
+  rejOpen = !rejOpen;
+  const list = document.getElementById('rejected-list');
+  list.style.display = rejOpen ? 'flex' : 'none';
+  document.getElementById('rej-toggle-label').textContent = rejOpen
+    ? `▲ Hide rejected emails`
+    : `▼ Show ${results.rejected?.length||0} rejected / noise emails`;
+}
+
+// Cover letter
+async function genCoverLetter(rank) {
+  const opp = allOpps.find(o => o.rank === rank);
+  if (!opp) return;
+  const btn = document.getElementById(`cover-btn-${rank}`);
+  const spin = document.getElementById(`cover-spinner-${rank}`);
+  btn.disabled = true; spin.style.display = 'inline-block';
+  btn.childNodes[btn.childNodes.length-1].textContent = ' Generating...';
+  try {
+    const res = await fetch('/cover_letter', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ opportunity: opp, profile })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const box = document.getElementById(`cover-box-${rank}`);
+    document.getElementById(`cover-text-${rank}`).textContent = data.cover_letter;
+    box.style.display = 'block';
+    btn.childNodes[btn.childNodes.length-1].textContent = ' ✓ Cover Letter Ready';
+    showToast('Cover letter generated!', '✉');
+  } catch(e) {
+    btn.disabled = false; spin.style.display = 'none';
+    btn.childNodes[btn.childNodes.length-1].textContent = ' ✉ Generate Personalized Cover Letter';
+    showToast('Could not generate cover letter', '⚠');
+  }
+}
+
+function copyCover(rank) {
+  const text = document.getElementById(`cover-text-${rank}`).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    document.getElementById(`copy-ok-${rank}`).style.display = 'inline';
+    showToast('Cover letter copied!', '📋');
+    setTimeout(() => { document.getElementById(`copy-ok-${rank}`).style.display = 'none'; }, 2500);
+  });
+}
+
+// Helpers
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function heatColor(heat) {
+  return { red:'#ff4757', yellow:'#ffa502', green:'#2ed573', expired:'#57606f' }[heat] || '#57606f';
+}
+function hexToRgb(hex) {
+  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : '255,255,255';
+}
+</script>
+{% endblock %}
