@@ -10,7 +10,11 @@ from cover_letter import generate_cover_letter
 load_dotenv()
 app = Flask(__name__)
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+<<<<<<< HEAD
 model = genai.GenerativeModel("gemini-2.0-flash")
+=======
+model = genai.GenerativeModel("gemini-1.5-flash")
+>>>>>>> 8de09026e84a4e7d8b7a3106d28609c90c1d34e0
 
 EXTRACTION_PROMPT = """You are an expert email analyst for university students in Pakistan.
 Analyze each email in the batch below and return a JSON array.
